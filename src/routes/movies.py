@@ -1,5 +1,6 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, MovieModel
 from sqlalchemy.orm import selectinload
@@ -42,13 +43,11 @@ async def get_movies(
 
     prev_page = (
         f"/theater/movies/?page={page - 1}&per_page={per_page}"
-        if page > 1
-        else f"/theater/movies/?page=1&per_page={per_page}"
+        if page > 1 else None
     )
     next_page = (
         f"/theater/movies/?page={page + 1}&per_page={per_page}"
-        if page < total_pages
-        else f"/theater/movies/?page={total_pages}&per_page={per_page}"
+        if page < total_pages else None
     )
 
     return MovieListResponseSchema(
@@ -65,22 +64,31 @@ async def create_movie(
     movie_data: MovieCreateRequestSchema,
     db: AsyncSession = Depends(get_db),
 ):
+    # Проверяем дубликат
     existing = await db.execute(
         select(MovieModel).where(
-            MovieModel.name == movie_data.name, MovieModel.date == movie_data.date
+            MovieModel.name == movie_data.name,
+            MovieModel.date == movie_data.date,
         )
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=409,
-            detail=f"A movie with the name '{movie_data.name}' and release date '{movie_data.date}' already exists.",
+            detail=(
+                f"A movie with the name '{movie_data.name}' and release date "
+                f"'{movie_data.date}' already exists."
+            ),
         )
 
+    # Создаём связанные объекты
     country = await get_or_create_country(db, movie_data.country)
-    genres = [await get_or_create_genre(db, g) for g in movie_data.genres]
-    actors = [await get_or_create_actor(db, a) for a in movie_data.actors]
-    languages = [await get_or_create_language(db, lang) for lang in movie_data.languages]
+    genres = [await get_or_create_genre(db, genre) for genre in movie_data.genres]
+    actors = [await get_or_create_actor(db, actor) for actor in movie_data.actors]
+    languages = [
+        await get_or_create_language(db, language) for language in movie_data.languages
+    ]
 
+    # Создаём фильм
     new_movie = MovieModel(
         name=movie_data.name,
         date=movie_data.date,
@@ -96,10 +104,21 @@ async def create_movie(
     )
     db.add(new_movie)
     await db.commit()
-    await db.refresh(new_movie)
 
-    return MovieCreateResponseSchema.model_validate(new_movie)
+    # Загружаем связанные объекты
+    result = await db.execute(
+        select(MovieModel)
+        .options(
+            selectinload(MovieModel.genres),
+            selectinload(MovieModel.actors),
+            selectinload(MovieModel.languages),
+            selectinload(MovieModel.country),
+        )
+        .where(MovieModel.id == new_movie.id)
+    )
+    movie_with_relations = result.scalar_one()
 
+    return MovieCreateResponseSchema.model_validate(movie_with_relations)
 
 @router.get("/movies/{movie_id}/", response_model=MovieCreateResponseSchema)
 async def get_movie_by_id(
