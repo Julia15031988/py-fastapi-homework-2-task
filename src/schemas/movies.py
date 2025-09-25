@@ -13,6 +13,7 @@ from typing import Optional
 
 router = APIRouter()
 
+
 class MovieDetailResponseSchema(BaseModel):
     id: int
     name: str
