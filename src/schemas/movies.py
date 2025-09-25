@@ -3,16 +3,13 @@ from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from datetime import date
+from datetime import date, timedelta
 from database import get_db, MovieModel
 from database.models import CountryModel, GenreModel, ActorModel, LanguageModel
-from pydantic import BaseModel, ConfigDict, conint, constr, Field
+from pydantic import BaseModel, ConfigDict, conint, constr, Field, validator
 from typing import List
 from typing import Optional
 from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field, constr, validator
-from datetime import date, timedelta
 
 
 router = APIRouter()
