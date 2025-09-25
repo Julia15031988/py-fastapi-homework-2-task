@@ -1,9 +1,9 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, MovieModel
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from database.models import CountryModel, GenreModel, ActorModel, LanguageModel
 from schemas.movies import (
     MovieDetailResponseSchema,
@@ -42,12 +42,12 @@ async def get_movies(
     movies = result.scalars().all()
 
     prev_page = (
-        f"/theater/movies/?page={page - 1}&per_page={per_page}"
-        if page > 1 else None
+        f"/theater/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None
     )
     next_page = (
         f"/theater/movies/?page={page + 1}&per_page={per_page}"
-        if page < total_pages else None
+        if page < total_pages
+        else None
     )
 
     return MovieListResponseSchema(
@@ -103,6 +103,15 @@ async def create_movie(
         languages=languages,
     )
     db.add(new_movie)
+    try:
+        await db.commit()
+        await db.refresh(new_movie)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Movie with the same name and date already exists.",  # або інше повідомлення, якщо є специфіка
+        )
     await db.commit()
 
     # Загружаем связанные объекты
@@ -179,7 +188,7 @@ async def update_movie(
     try:
         await db.commit()
         return {"detail": "Movie updated successfully."}
-    except Exception:
+    except (IntegrityError, SQLAlchemyError):
         await db.rollback()
         raise HTTPException(status_code=400, detail="Invalid input data.")
 
@@ -189,10 +198,9 @@ async def get_or_create_country(db, code: str):
     country = result.scalar_one_or_none()
     if country:
         return country
+
     new_country = CountryModel(code=code, name=None)
     db.add(new_country)
-    await db.commit()
-    await db.refresh(new_country)
     return new_country
 
 

@@ -9,16 +9,26 @@ from database.models import CountryModel, GenreModel, ActorModel, LanguageModel
 from pydantic import BaseModel, ConfigDict, conint, constr, Field
 from typing import List
 from typing import Optional
+from enum import Enum
+from typing import Optional
+from pydantic import BaseModel, Field, constr, validator
+from datetime import date, timedelta
 
 
 router = APIRouter()
+
+
+class MovieStatus(str, Enum):
+    released = "Released"
+    post_production = "Post Production"
+    in_production = "In Production"
 
 
 class MovieDetailResponseSchema(BaseModel):
     id: int
     name: str
     date: date
-    score: conint(ge=0, le=100)
+    score: float = Field(..., ge=0, le=10)
     overview: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -26,10 +36,11 @@ class MovieDetailResponseSchema(BaseModel):
 
 class MovieListResponseSchema(BaseModel):
     movies: List[MovieDetailResponseSchema]
-    prev_page: str
-    next_page: str
+    prev_page: Optional[str] = None
+    next_page: Optional[str] = None
     total_pages: int
     total_items: int
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CountrySchema(BaseModel):
@@ -67,9 +78,15 @@ class MovieUpdateRequestSchema(BaseModel):
     date: Optional[date] = None
     score: Optional[float] = Field(None, ge=0, le=100)
     overview: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[MovieStatus] = None
     budget: Optional[float] = Field(None, ge=0)
     revenue: Optional[float] = Field(None, ge=0)
+
+    @validator("date")
+    def validate_date(cls, value):
+        if value and value > date.today() + timedelta(days=365):
+            raise ValueError("Date cannot be more than 1 year in the future.")
+        return value
 
 
 class MovieCreateRequestSchema(BaseModel):
@@ -77,10 +94,16 @@ class MovieCreateRequestSchema(BaseModel):
     date: date
     score: float = Field(..., ge=0, le=100)
     overview: str
-    status: str
+    status: MovieStatus
     budget: float = Field(..., ge=0)
     revenue: float = Field(..., ge=0)
-    country: str
+    country: str = Field(..., min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
     genres: List[str]
     actors: List[str]
     languages: List[str]
+
+    @validator("date")
+    def validate_date(cls, value):
+        if value > date.today() + timedelta(days=365):
+            raise ValueError("Date cannot be more than 1 year in the future.")
+        return value
