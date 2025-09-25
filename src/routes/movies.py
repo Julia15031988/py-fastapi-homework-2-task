@@ -120,6 +120,7 @@ async def create_movie(
 
     return MovieCreateResponseSchema.model_validate(movie_with_relations)
 
+
 @router.get("/movies/{movie_id}/", response_model=MovieCreateResponseSchema)
 async def get_movie_by_id(
     movie_id: int,
