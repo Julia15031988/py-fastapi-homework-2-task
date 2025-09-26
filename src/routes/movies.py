@@ -40,11 +40,9 @@ async def get_movies(
         select(MovieModel).order_by(MovieModel.id.desc()).offset(offset).limit(per_page)
     )
     movies = result.scalars().all()
-    print(f"{movies=}")
 
     if not movies:
         raise HTTPException(status_code=404, detail="No movies found.")
-    print(f"{movies=}")
 
     prev_page = (
         f"/theater/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None
@@ -69,7 +67,7 @@ async def create_movie(
     movie_data: MovieCreateRequestSchema,
     db: AsyncSession = Depends(get_db),
 ):
-    # Проверяем дубликат
+
     existing = await db.execute(
         select(MovieModel).where(
             MovieModel.name == movie_data.name,
@@ -85,7 +83,6 @@ async def create_movie(
             ),
         )
 
-    # Создаём связанные объекты
     country = await get_or_create_country(db, movie_data.country)
     genres = [await get_or_create_genre(db, genre) for genre in movie_data.genres]
     actors = [await get_or_create_actor(db, actor) for actor in movie_data.actors]
@@ -93,7 +90,6 @@ async def create_movie(
         await get_or_create_language(db, language) for language in movie_data.languages
     ]
 
-    # Создаём фильм
     new_movie = MovieModel(
         name=movie_data.name,
         date=movie_data.date,
@@ -108,18 +104,10 @@ async def create_movie(
         languages=languages,
     )
     db.add(new_movie)
-    try:
-        await db.commit()
-        await db.refresh(new_movie)
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Movie with the same name and date already exists.",  # або інше повідомлення, якщо є специфіка
-        )
-    await db.commit()
 
-    # Загружаем связанные объекты
+    await db.commit()
+    await db.refresh(new_movie)
+
     result = await db.execute(
         select(MovieModel)
         .options(
