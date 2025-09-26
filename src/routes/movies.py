@@ -42,7 +42,6 @@ async def get_movies(
     movies = result.scalars().all()
     print(f"{movies=}")
 
-
     if not movies:
         raise HTTPException(status_code=404, detail="No movies found.")
     print(f"{movies=}")

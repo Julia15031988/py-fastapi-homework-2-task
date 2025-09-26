@@ -6,7 +6,15 @@ from sqlalchemy.orm import joinedload
 from datetime import date, timedelta
 from database import get_db, MovieModel
 from database.models import CountryModel, GenreModel, ActorModel, LanguageModel
-from pydantic import BaseModel, ConfigDict, conint, constr, Field, validator, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    conint,
+    constr,
+    Field,
+    validator,
+    field_validator,
+)
 from typing import List
 from typing import Optional
 from enum import Enum
@@ -27,6 +35,7 @@ class NamedEntitySchema(BaseModel):
     id: int
     name: str
     model_config = ConfigDict(from_attributes=True)
+
 
 class GenreSchema(BaseModel):
     id: int
