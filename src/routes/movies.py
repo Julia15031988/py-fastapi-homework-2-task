@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, MovieModel
@@ -40,6 +40,12 @@ async def get_movies(
         select(MovieModel).order_by(MovieModel.id.desc()).offset(offset).limit(per_page)
     )
     movies = result.scalars().all()
+    print(f"{movies=}")
+
+
+    if not movies:
+        raise HTTPException(status_code=404, detail="No movies found.")
+    print(f"{movies=}")
 
     prev_page = (
         f"/theater/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None
